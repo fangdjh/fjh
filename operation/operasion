@@ -1,0 +1,343 @@
+nmcli connection add type ethe<tab> con-name eth1 ifname eth1 autoconnect yes
+//激活eth1网卡
+
+安装nginx
+useradd -s /sbin/nologin nginx
+yum -y install gcc pcre-devel openssl-devel		//安装依赖包
+tar -xf nginx-1.12.1.tar.gz
+cd /nginx...
+./configure --prefix=/usr/local/nginx --user=nginx --group=nginx --with-http_ssl_module				//检查并指定安装环境，用户，用户组以及开启加密功能
+make；make install				//编译并安装
+#更新不用make install，而是备份旧的程序（sbin下）将新程序拷贝到这个目录，并重启服务make upgrade
+ls /usr/local/nginx			//验证
+/usr/local/nginx/sbin/nginx		//启动服务
+/usr/local/nginx/sbin/nginx -s stop	//关闭服务
+/usr/local/nginx/sbin/nginx -s reload//重新加载配置文件					
+/usr/local/nginx/sbin/nginx -V		//查看软件信息
+ln -s /usr/local/nginx/sbin/nginx /sbin	//设置软连接，方便使用
+
+nginx配置文件/usr/local/nginx/conf/nginx.conf
+全局配置(用户名，日志，进程,并发)
+http{
+	server{
+		listen 80;
+		server_name localhost;
+		root html;
+	}
+}
+
+启用用户验证：
+auth_basic "Input Password:";
+auth_basic_user_file "/usr/local/nginx/pass";
+#yum -y install httpd-tools
+#htpasswd -c /usr/local/nginx/pass 用户名	//创建验证用户，添加用户时不用加-c选项
+
+虚拟主机[基于域名，基于端口，基于IP]
+一台电脑，一个软件，多个网站
+nginx中配置文件有多少个server{}就有多少个虚拟主机
+
+location 匹配用户的地址栏（判断），支持正则
+location /a {
+	deny 1.1.1.1;
+	allow all;
+}
+location /b {
+	deny all;
+}
+location /c {
+	allow all;
+}
+
+
+找出动态页面给php服务器运行然后去返回运行后的结果
+
+LNMP常见问题
+1.出现下载页面【没有动静分离】
+2.An error occurred（日志Connection refused）
+3.空白页（可能是php脚本错误）
+4.File not found（没有页面文件）
+#tailf /usr/local/nginx/logs/error.log
+nginx日志文件
+#tailf /var/log/php-fpm/www-error.log
+php-fpm日志文件
+
+vim +n file		//打开并进入到文件的第n行
+
+地址重写：访问一个页面时会调转到另一个页面
+1.文件被删除或移动
+2.域名改变
+3.路径比较深
+rewrite /a.html  /b.html;	//访问一个页面调转到另一个页面
+redirect				//会直接调转网页的地址栏
+rewrite ^/(.*) http://www.tmooc.cn/$1;	//访问一个网站的一个页面调转到另一个网站的这一个页面
+
+不同浏览器访问得到不同页面
+echo "I am Normal page" > /usr/local/nginx/html/test.html
+mkdir  -p  /usr/local/nginx/html/firefox/
+echo "firefox page" > /usr/local/nginx/html/firefox/test.html
+vim /sur/local/nginx/conf/nginx.conf
+if ($http_user_agent ~* firefox){rewrite ^/(.*) /firefox/$1;}
+如果访问的服务器是firefox即返回/firefox下的页面
+
+server {
+	listen 443 ssl;
+	
+实现网页的动静分离
+location ~ \.php$ {
+    proxy_pass   http://127.0.0.1;
+}	
+nginx代理服务器
+pstream webserver {
+	ip_hash;		//让相同的客户访问相同的服务器
+      server 192.168.2.100:80 weight=2;
+      server 192.168.2.200:80;
+max_fails=1		//访问后台服务器的失败次数
+fail_timeout=20	//失败之后的超时时间
+weight=2		//后台服务器的权重
+}
+
+location / {     
+proxy_pass http://webserver;
+
+基于tcp的调度服务器
+编译安装必须要使用--with-stream参数开启4层代理模块
+stream {
+        upstream backend {
+                server 192.168.2.100:22;
+                server 192.168.2.200:22;
+        }
+        server {
+                listen 12345;
+        proxy_pass backend;
+        proxy_connect_timeout 1s;
+        }
+}
+		//手动添加在http的前面
+重启服务
+
+
+nginx的常见问题及处理
+屏蔽nginx版本号
+http {
+server_tokens off;	//不显示版本号信息
+优化nginx，增加并发量
+修改nginx配置文件
+events {
+    worker_connections  65535;
+}
+修改系统配置
+ulimit -Hn 10000		//临时配置
+ulimit -Sn 10000
+vim /etc/security/limits.conf		//永久配置
+*   soft  onfile   100000
+*   hard  onfile   100000
+
+浏览器缓存，针对图片、声音、视频
+
+
+program	程序[硬盘]
+process	进程[内存]
+thread	线程[多线程共享一个进程]
+
+/etc/hosts系统配置文件
+本地域名系统解析，具有最高优先级
+
+传统的网站架构
+			|server1--|
+----->proxy--------|server2--|mysql主从
+			|server3--|
+
+传统web架构的问题
+许多web数据都存放于数据库，读写的速度过慢
+工作中数据能不放数据库就一定不要放入数据库中
+但是有些数据必须放数据库（文字，字符:metedata）数据的数据（因其有强大的查询能力）
+sql数据库：mysql，oracle，sqlserver
+.00000
+缓存数据库（断电会导致数据丢失0	）
+
+数据读取速度对比
+性能
+CPU缓存>内存>磁盘>数据库
+
+web:httpd,nginx.tengine
+	静态页面，动态(php，python，perl)
+nginx+php
+tomcat+java
+java是一种跨平台的、面向对象的程序设计语言，具有卓越的通用性、高校性、平台移动性和安全性
+java的软件包名是jdk，是一个工具箱
+是整个java的核心
+java解释器
+打包工具war，jar
+java[一套生态]内置大量的类库
+
+jre是jdk的子集，jre是java运行环境，包括：
+java虚拟机
+java核心类库和支持文件
+不包含开发工具
+
+servlet是java扩展web服务器功能的组建规范
+常见的Servlet容器：
+Jboss、tomcat(开源免费)、weblogic、websphere
+tomcat目录
+bin				//主程序目录
+lib				//库文件目录
+logs				//日志目录
+temp				//临时目录
+work				//自动编译目录jsp代码转换servlet
+conf				//配置文件目录
+webapps			//页面目录
+
+tomcat配置文件
+整体格式：
+<server>
+  <service>
+    <connect port=8080 />
+     <engine defaulthost=localhost>
+        <host name=www.a.com></host>
+        <host name=www.b.com></host>
+     </engine>
+  </service>
+</server>
+
+httpd、nginx、tomcat的虚拟主机
+httpd:
+<VirtualHost *:80>
+	ServerName www.a.com
+	DocumentRoot /var/www/html
+</VirtualHost>
+
+
+nginx:
+server {
+	listen 80;
+	server_name www.a.com;
+	location / {
+		root html;
+		index index.html;
+	}
+}
+
+
+tomcat:
+<Host name="www.a.com"  appBase="aa"
+            unpackWARs="true" autoDeploy="true">
+      </Host>
+
+
+tomcat 的网页文件存放在一个目录下的ROOT下
+
+varnish代理服务器
+用户访问代理，代理没有页面，到后端web找页面
+代理拿到页面返回给用户，同时varnish会缓存页面在本地
+
+
+varnishadm ban.url 页面名称		//varnish清缓存
+varnishlog					//varnish日志
+varnishncsa					//访问日志
+
+
+版本控制
+cvs、subversion（svn）、git
+svn是一个自由/开元的版本控制系统
+在svn管理下，文件和目录可以超越时空
+svn允许数据恢复到早期版本
+能检查数据修改的历史
+许多人将版本控制系统当作一种神奇的“时间机器”
+允许多人写作文档并跟踪所作的修改
+客户端
+	命令行
+	图形
+通信方式
+	本地访问
+	svn服务器
+	web服务
+
+版本库
+典型的客户/服务器系统
+	版本库是版本控制的核心
+	任意数量客户端
+	客户端通过写数据库分享代码
+svn特点
+	记录每一次改变
+
+版本模型：
+锁定-修改-解锁的方案
+这个方案可能会带来的问题：
+	-锁定文件后忘记解锁等问题
+	-锁定导致不必要的串行开发
+
+拷贝-修改-合并的方案
+
+svn控制系统使用拷贝-修改-合并模型
+	-每个客户连接版本库，并建立个人工作副本
+	-用户并行工作，修改自己的副本
+	-最终，合并版本！
+	-个别冲突问题，需要人为手动解决
+
+创建版本库
+	用法：svnadmin 命令/版本库路径 [选项]
+	命令：create		创建一个新的版本库
+导入项目代码
+使用svn命令将项目代码导入到版本库中
+	import指令执行导入操作
+	-m选项设置注释性的字符串
+
+svn服务的启动
+svnserve -d -r /var/svn/project1
+客户端访问svn：//192.168.2.100/
+svnserve -d 或 systemctl restart svnserve.service
+客户端访问svn：//192.168.2.100/var/svn/project1
+客户端的访问命令
+svn --username money --password systemctl co svn://192.168.2.100[/var/svn/project1] code
+svn常用的命令操作
+svn ci -m ""		上传
+svn co -m ""		下载
+svn update			更新
+svn info			查看版本库
+svn log			查看日志信息
+svn add			新建文件
+svn rm			删除文件
+svn mkdir			新建目录
+svn diff			对比本地副本与服务器中的副本不同
+svn cat 			可以直接看服务器上的文件
+svn revert			还原修改了但未提交的文件
+svn merge -rA:B file	将文件从第A版本还原到B版本
+svn co -rA svn://192.168.2.100 code		将所有文件还原到第A版本
+svnadmin dump /var/svn/project1 > /root/my.bak		备份
+svnadmin load /var/svn/project2 < /root/my.bak		还原
+
+
+
+github是一个面向开源及私有软件项目的托管平台
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+http:80
+https:443
+ssh:22
+ftp:21
+rsync:873
+POP3:110
+imap:143
+smtp:25
+dhcp:67	68
+mariadb:3306
+samba:135
+php-fpm:9000
+dns:53
+memcache:11211
+svn:3690
