@@ -1,0 +1,72 @@
+NSD SHELL DAY07
+
+案例1：编写一键部署软件脚本
+案例2：编写监控脚本
+1 案例1：编写一键部署软件脚本
+1.1 问题
+本案例要求编写脚本实现一键部署Nginx软件（Web服务器）：
+一键源码安装Nginx软件
+脚本自动安装相关软件的依赖包
+脚本自动判断yum是否可用
+1.2 步骤
+实现此案例需要按照如下步骤进行。
+步骤一：准备工作
+1）判断yum源是否可用
+通过yum repolist查看软件包数量是否大于0：
+[root@svr5 ~]# yum repolist 
+[root@svr5 ~]# yum repolist | awk '/repolist/{print $2}' 
+[root@svr5 ~]# yum repolist | awk '/repolist/{print $2}' |sed 's/,//'
+[root@svr5 ~]# N=$(yum repolist | awk '/repolist/{print $2}' |sed 's/,//')
+[root@svr5 ~]# [ $N –le 0 ] && echo 'yum 不可用'
+2）依赖包
+源码安装Nginx需要提前安装依赖包软件gcc,openssl-devel,pcre-devel
+步骤二：编写脚本
+1）参考脚本内容如下：
+[root@svr5 ~]# cat test.sh
+#!/bin/bash
+N=$(yum repolist | awk '/repolist/{print $2}' | sed 's/,//')
+if [ $N -le 0 ];then
+    echo "yum 不可用"
+    exit
+fi
+yum -y install gcc openssl-devel pcre-devel
+tar -xf nginx-1.12.2.tar.gz
+cd nginx-1.12.2
+./configure
+make
+make install
+2）确认安装效果
+Nginx默认安装路径为/usr/local/nginx,该目录下会提供4个子目录，分别如下：
+/usr/local/nginx/conf	配置文件目录
+/usr/local/nginx/html	网站页面目录
+/usr/local/nginx/logs	Nginx日志目录
+/usr/local/nginx/sbin	主程序目录
+主程序命令参数：
+[root@svr5 ~]# /usr/local/nginx/sbin/nginx                //启动服务
+[root@svr5 ~]# /usr/local/nginx/sbin/nginx    -s stop        //关闭服务
+[root@svr5 ~]# /usr/local/nginx/sbin/nginx    -V            //查看软件信息
+2 案例2：编写监控脚本
+2.1 问题
+本案例要求编写脚本，实现计算机各个性能数据监控的功能，具体监控项目要求如下：
+CPU负载
+网卡流量
+内存剩余容量
+磁盘剩余容量
+计算机账户数量
+当前登录账户数量
+计算机当前开启的进程数量
+本机已安装的软件包数量
+2.2 步骤
+实现此案例需要按照如下步骤进行。
+步骤一：准备工作
+1）查看性能数据的命令
+[root@svr5 ~]# uptime                            //查看CPU负载
+[root@svr5 ~]# ifconfig eth0                    //查看网卡流量
+[root@svr5 ~]# free                            //查看内存信息
+[root@svr5 ~]# df                                //查看磁盘空间
+[root@svr5 ~]# wc –l /etc/passwd                //查看计算机账户数量
+[root@svr5 ~]# who |wc –l                        //查看登录账户数量
+[root@svr5 ~]# rpm –qa |wc -l                    //查看已安装软件包数量
+步骤二：编写参考脚本
+1）脚本内容如下：
+[root@svr5 ~]# cat test.sh
